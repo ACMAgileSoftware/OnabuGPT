@@ -67,15 +67,6 @@ if api_key and language and experience and role:
 
     messages = st.session_state.get("messages", [])
 
-    for i,msg in enumerate(st.session_state.messages[1:]):
-        if i % 2 == 1:
-            message(msg.content, is_user=True,key=f"message_{i}_human" )
-        else:
-            message(msg.content, is_user=False,key=f"message_{i}_ai" )
-
-
-
-
     user_input = st.text_input("Enter your message here", key="user_input")
     if user_input:
         formatted_chat_prompt = chat_prompts.format_messages(experience = experience, role = role, language = language,message = user_input)
@@ -87,8 +78,11 @@ if api_key and language and experience and role:
     #prompt = chat_prompts.format_messages(experience = experience, role = role, language = language,message = message)
     #response = chain.run({'role':role, 'message':message, 'experience':experience, 'language':language},callbacks=[st_cb])
 
-
-   
+    for i,msg in enumerate(st.session_state.messages[1:]):
+        if i % 2 == 1:
+            message(msg.content, is_user=True,key=f"message_{i}_human" )
+        else:
+            message(msg.content, is_user=False,key=f"message_{i}_ai" )
     
     export_list= []
     for i,msg in enumerate(st.session_state.messages):
@@ -108,4 +102,4 @@ if api_key and language and experience and role:
     conversation_df.columns = ["message","sender"]
     st.write(conversation_df)
     #st.write(st.session_state.messages)
-    ste.download_button("Download Conversation",conversation_df, "conversation.cs")
+    ste.download_button("Download Conversation",conversation_df, "conversation.csv")

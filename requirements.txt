@@ -5,3 +5,4 @@ streamlit-chat
 streamlit-ext
 langchain
 openai
+openpyxl
