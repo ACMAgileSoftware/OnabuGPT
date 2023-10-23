@@ -1,0 +1,7 @@
+pandas
+streamlit
+numpy
+streamlit-chat
+streamlit-ext
+langchain
+openai
