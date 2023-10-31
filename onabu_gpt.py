@@ -109,20 +109,20 @@ if language and experience and role:
 
 
 
-export_list= []
-for i,msg in enumerate(st.session_state.messages):
-    if i == 0:
-        export_list.append(msg.content+" -system")
-    elif i % 2 == 1:
-        export_list.append(msg.content+" -gpt")
-    else:
-        export_list.append(msg.content+" -human")
+    export_list= []
+    for i,msg in enumerate(st.session_state.messages):
+        if i == 0:
+            export_list.append(msg.content+" -system")
+        elif i % 2 == 1:
+            export_list.append(msg.content+" -gpt")
+        else:
+            export_list.append(msg.content+" -human")
 
 
-#st.write(export_list)
-def convert_df(df):
-    return df.to_csv().encode('utf-8')
+    #st.write(export_list)
+    def convert_df(df):
+        return df.to_csv().encode('utf-8')
 
-conversation_df = pd.DataFrame(export_list)[0].str.split(" -",expand=True)
-conversation_df.columns = ["message","sender"]
-st.write(conversation_df)
+    conversation_df = pd.DataFrame(export_list)[0].str.split(" -",expand=True)
+    conversation_df.columns = ["message","sender"]
+    st.write(conversation_df)
