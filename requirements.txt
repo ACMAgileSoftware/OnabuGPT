@@ -6,3 +6,4 @@ streamlit-ext
 langchain
 openai
 openpyxl
+qdrant-client

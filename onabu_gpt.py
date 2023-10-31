@@ -1,58 +1,76 @@
+from dotenv import load_dotenv
 import streamlit as st
-from langchain.prompts.chat import ChatPromptTemplate
-from langchain.chains import LLMChain
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import (
-    SystemMessage,
-    HumanMessage,
-    AIMessage
-)
-from streamlit_chat import message
-from langchain.memory import ConversationBufferMemory
-from langchain.memory.chat_message_histories import StreamlitChatMessageHistory
-from langchain.callbacks import StreamlitCallbackHandler
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain.llms import OpenAI
+from langchain.vectorstores import Qdrant 
+from langchain.embeddings import HuggingFaceEmbeddings
+import qdrant_client
+import os
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.schema import HumanMessage, SystemMessage, AIMessage
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
+from streamlit_chat import message
 import pandas as pd
-import streamlit_ext as ste
+
+os.environ["QDRANT_HOST"]=st.secrets["QDRANT_HOST"]
+os.environ["QDRANT_API_KEY"]=st.secrets["QDRANT_API_KEY"]
+os.environ["QDRANT_COLLECTION_NAME"]=st.secrets["QDRANT_COLLECTION_NAME"]
+os.environ["OPENAI_API_KEY"]=st.secrets["OPENAI_API_KEY"]
 
 
 
-#msgs = StreamlitChatMessageHistory(key="langchain_messages")
-#memory = ConversationBufferMemory(chat_memory=msgs ,return_messages=True,output_key="output")
+system_message = "You are an experienced agile coach that gives insightful information to customer within 300 character based on their language preference which is {language} and based on the context below. If the question cannot be answered using the information provided answer with 'I don't know'. Do not talk about politics."
+human_template = """I'm a {experience} {role}. Answer me in 200 characters at most. And answer me in {language}."""
 
-st.title("Onabu GPT")
-api_key = st.text_input("Enter OpenAI api key")
+   
+sys_message = SystemMessagePromptTemplate.from_template(system_message)
+human_message = HumanMessagePromptTemplate.from_template(human_template)
+chat_prompts = ChatPromptTemplate.from_messages([("system",system_message), ("human",human_template)])
 
+def augment_prompt(query:str,vector_store,human_question):
+    results = vector_store.similarity_search(query,k=3)
+    source_knowledge = "\n".join([x.page_content for x in results])
 
-text = "You are an experienced agile coach that gives insightful information to customer within 200 character based on their language preference which is {language}."
-human_template = """I'm a {experience} {role}. Answer me in 200 characters at most. And answer me in {language}. {message}"""
+    augmented_prompt = f"""{human_question}
+    context: {source_knowledge}
 
-if api_key:
-    model = st.selectbox("OpenAI Model", ["gpt-3.5-turbo", "gpt-3.5-turbo-16k","text-davinci-003"])
-    chat = ChatOpenAI(openai_api_key=api_key, model=model,temperature=0,streaming=True)
-    #st_cb=StreamlitCallbackHandler(st.container(),expand_new_thoughts=False)
-    sys_message = SystemMessagePromptTemplate.from_template(text)
-    human_message = HumanMessagePromptTemplate.from_template(human_template)
-    chat_prompts = ChatPromptTemplate.from_messages([("system",text), ("human",human_template)])
-    #chain = LLMChain(llm=llm,prompt=chat_prompts,callbacks=[st_cb],memory=memory)
+    question: {query}
+    """
+    return augmented_prompt
 
-else:
-    st.write("Please provide an api key and press enter.")
+def get_vector_store():
+    client = qdrant_client.QdrantClient(
+    os.getenv("QDRANT_HOST"),
+    api_key=os.getenv("QDRANT_API_KEY")
+)
+    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/multi-qa-distilbert-cos-v1")
+    
+    vector_store = Qdrant(
+    client=client, 
+    collection_name=os.getenv("QDRANT_COLLECTION_NAME"), 
+    embeddings=embeddings,
+)
+    return vector_store
+
+#load_dotenv()
+vector_store = get_vector_store()
+
+chat= ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0,streaming=True)
+
+st.set_page_config(page_title="Onabu GPT")
+st.header("Onabu GPT - Agile Coach Assistant")
 
     
-
-
 language = st.selectbox("Language", ["English", "Türkçe"], index=None)
 experience = st.selectbox("Experience", ["Newbie", "Mid-level", "Experienced"],index=None)
 role = st.selectbox("Role", ["Scrum Master", "Agile Coach", "Product Owner"],index=None)
 
-if api_key and language and experience and role:
 
+if language and experience and role:
     if "messages" not in st.session_state:
         formatted_sys_message = sys_message.format(language=language)
         st.session_state.messages = [SystemMessage(content=formatted_sys_message.content)]
@@ -67,39 +85,44 @@ if api_key and language and experience and role:
 
     messages = st.session_state.get("messages", [])
 
-    user_input = st.text_input("Enter your message here", key="user_input")
-    if user_input:
-        formatted_chat_prompt = chat_prompts.format_messages(experience = experience, role = role, language = language,message = user_input)
-        st.session_state.messages.append(HumanMessage(content=user_input))
-        with st.spinner("Thinking..."):
-            response = chat(formatted_chat_prompt)
-        st.session_state.messages.append(AIMessage(content=response.content))
 
-    #prompt = chat_prompts.format_messages(experience = experience, role = role, language = language,message = message)
-    #response = chain.run({'role':role, 'message':message, 'experience':experience, 'language':language},callbacks=[st_cb])
+    user_question = st.text_input("Enter your question here", key="user_question")
+    if user_question:
+        formatted_chat_prompt = chat_prompts.format_messages(experience = experience, role = role, language = language)
+        prompt = HumanMessage(content=augment_prompt(user_question,vector_store,formatted_chat_prompt))
+        st.session_state.messages.append(HumanMessage(content=user_question))
+        #st.session_state.messages.append(prompt)
+        with st.spinner("Thinking..."):
+            answer = chat([prompt])            
+        st.session_state.messages.append(AIMessage(content=answer.content))
+
 
     for i,msg in enumerate(st.session_state.messages[1:]):
         if i % 2 == 1:
             message(msg.content, is_user=True,key=f"message_{i}_human" )
         else:
             message(msg.content, is_user=False,key=f"message_{i}_ai" )
-    
-    export_list= []
-    for i,msg in enumerate(st.session_state.messages):
-        if i == 0:
-            export_list.append(msg.content+" -system")
-        elif i % 2 == 1:
-            export_list.append(msg.content+" -gpt")
-        else:
-            export_list.append(msg.content+" -human")
 
 
-    #st.write(export_list)
-    def convert_df(df):
-        return df.to_csv().encode('utf-8')
 
-    conversation_df = pd.DataFrame(export_list)[0].str.split(" -",expand=True)
-    conversation_df.columns = ["message","sender"]
-    st.write(conversation_df)
-    #st.write(st.session_state.messages)
-    ste.download_button("Download Conversation",conversation_df, "conversation.csv")
+
+
+
+
+export_list= []
+for i,msg in enumerate(st.session_state.messages):
+    if i == 0:
+        export_list.append(msg.content+" -system")
+    elif i % 2 == 1:
+        export_list.append(msg.content+" -gpt")
+    else:
+        export_list.append(msg.content+" -human")
+
+
+#st.write(export_list)
+def convert_df(df):
+    return df.to_csv().encode('utf-8')
+
+conversation_df = pd.DataFrame(export_list)[0].str.split(" -",expand=True)
+conversation_df.columns = ["message","sender"]
+st.write(conversation_df)
