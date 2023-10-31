@@ -7,4 +7,6 @@ langchain
 openai
 openpyxl
 qdrant-client
-python-dotenv
+python-
+transformers
+sentence-transformers
