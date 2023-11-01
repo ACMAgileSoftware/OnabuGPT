@@ -15,6 +15,7 @@ from langchain.prompts.chat import (
 )
 from streamlit_chat import message
 import pandas as pd
+import streamlit_ext as ste
 
 os.environ["QDRANT_HOST"]=st.secrets["QDRANT_HOST"]
 os.environ["QDRANT_API_KEY"]=st.secrets["QDRANT_API_KEY"]
@@ -126,3 +127,6 @@ if language and experience and role:
     conversation_df = pd.DataFrame(export_list)[0].str.split(" -",expand=True)
     conversation_df.columns = ["message","sender"]
     st.write(conversation_df)
+
+
+    ste.download_button("Download Conversation",conversation_df, "conversation.csv")
