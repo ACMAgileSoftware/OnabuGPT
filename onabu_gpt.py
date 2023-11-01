@@ -90,7 +90,11 @@ if language and experience and role:
     user_question = st.text_input("Enter your question here", key="user_question")
     if user_question:
         formatted_chat_prompt = chat_prompts.format_messages(experience = experience, role = role, language = language)
-        prompt = HumanMessage(content=augment_prompt(user_question,vector_store,formatted_chat_prompt))
+        if len(st.session_state.messages) > 3:
+            memory_question = user_question+st.session_state.messages[-1].content
+            prompt = HumanMessage(content=augment_prompt(memory_question,vector_store,formatted_chat_prompt))
+        else:
+            prompt = HumanMessage(content=augment_prompt(user_question,vector_store,formatted_chat_prompt))
         st.session_state.messages.append(HumanMessage(content=user_question))
         #st.session_state.messages.append(prompt)
         with st.spinner("Thinking..."):
