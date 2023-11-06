@@ -41,7 +41,7 @@ def augment_prompt(query:str,vector_store,human_question):
 
     question: {query}
     """
-    print("-------------------" +source_knowledge+ "-------------------")
+    st.write("-------------------" +source_knowledge+ "-------------------")
     return augmented_prompt
 
 def get_vector_store():
